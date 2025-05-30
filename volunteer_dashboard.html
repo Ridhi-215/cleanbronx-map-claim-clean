@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Volunteer Dashboard - CleanBronx</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      background: #f5f8fa;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      color: #333;
+    }
+    header {
+      background: #28a745;
+      color: white;
+      padding: 16px 24px;
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    main {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      padding: 20px;
+      overflow-y: auto;
+      background: #eef1f4;
+    }
+    section {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px;
+      flex: 1 1 30%;
+      min-width: 300px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 120px);
+      overflow-y: auto;
+    }
+    section h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+      color: #28a745;
+      border-bottom: 2px solid #28a745;
+      padding-bottom: 6px;
+    }
+    #map {
+      height: 400px;
+      width: 100%;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    button.claim-btn {
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-top: 10px;
+    }
+    button.claim-btn:hover {
+      background: #218838;
+    }
+    ul#history-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      flex: 1;
+      overflow-y: auto;
+    }
+    ul#history-list li {
+      background: #f9f9f9;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+    }
+    .logout-btn {
+      background: #dc3545;
+      border: none;
+      color: white;
+      padding: 8px 14px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .logout-btn:hover {
+      background: #c82333;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+    }
+    table th, table td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+    table th {
+      background-color: #f1f1f1;
+      font-weight: 600;
+    }
+    #points {
+      margin-right: 20px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div id="welcome-msg">Welcome, Volunteer</div>
+    <div>
+      <span id="points">Points: 0</span>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="available-spots">
+      <h2>Available Cleanup Spots</h2>
+      <div id="map"></div>
+    </section>
+
+    <section id="claim-history">
+      <h2>Claim History</h2>
+      <ul id="history-list"></ul>
+    </section>
+
+    <section id="leaderboard">
+      <h2>🏆 Leaderboard</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Points</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- Firebase + Leaflet JS -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyC5E5kuLgQrWTfSe5a1JqFNbLxHaY2I0JQ",
+      authDomain: "cleanbronx.firebaseapp.com",
+      projectId: "cleanbronx",
+      storageBucket: "cleanbronx.appspot.com",
+      messagingSenderId: "14384324606",
+      appId: "1:14384324606:web:e5a5ab272af946fc992aaf"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    const map = L.map("map").setView([20.5937, 78.9629], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "© OpenStreetMap contributors"
+    }).addTo(map);
+
+    let currentUser = null;
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user) {
+        alert("Please login first");
+        window.location.href = "volunteer_login.html";
+        return;
+      }
+      currentUser = user;
+      document.getElementById('welcome-msg').innerText = `Welcome, ${user.email}`;
+      await loadVolunteerPoints();
+      await loadAvailableSpots();
+      await loadClaimHistory();
+      await loadLeaderboard();
+    });
+
+    async function loadVolunteerPoints() {
+      const doc = await db.collection("volunteers").doc(currentUser.uid).get();
+      const points = doc.exists ? doc.data().points || 0 : 0;
+      document.getElementById("points").innerText = `Points: ${points}`;
+    }
+
+    function clearMapMarkers() {
+      map.eachLayer((layer) => {
+        if (layer instanceof L.Marker) {
+          map.removeLayer(layer);
+        }
+      });
+    }
+
+    async function loadAvailableSpots() {
+      clearMapMarkers();
+      const snapshot = await db.collection("cleanupReports").get();
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (!data.claimedBy && data.latitude && data.longitude) {
+          const marker = L.marker([data.latitude, data.longitude]).addTo(map);
+          marker.bindPopup(`
+            <b>${data.title}</b><br>
+            ${data.description}<br><br>
+            <button class="claim-btn" onclick="claimReport('${doc.id}', this)">Claim</button>
+          `);
+        }
+      });
+    }
+
+    async function claimReport(reportId, btn) {
+      btn.disabled = true;
+      try {
+        await db.collection("cleanupReports").doc(reportId).update({
+          claimedBy: currentUser.uid,
+          claimedAt: new Date()
+        });
+
+        const volunteerRef = db.collection("volunteers").doc(currentUser.uid);
+        await db.runTransaction(async (t) => {
+          const doc = await t.get(volunteerRef);
+          const currentPoints = doc.exists ? doc.data().points || 0 : 0;
+          t.set(volunteerRef, { points: currentPoints + 10 }, { merge: true });
+        });
+
+        alert("Report claimed! +10 points");
+        await loadVolunteerPoints();
+        await loadAvailableSpots();
+        await loadClaimHistory();
+        await loadLeaderboard();
+      } catch (err) {
+        alert("Error claiming report: " + err.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function loadClaimHistory() {
+      const historyList = document.getElementById("history-list");
+      historyList.innerHTML = "";
+
+      const snapshot = await db.collection("cleanupReports")
+        .where("claimedBy", "==", currentUser.uid)
+        .orderBy("claimedAt", "desc")
+        .get();
+
+      if (snapshot.empty) {
+        historyList.innerHTML = "<li>No claimed reports yet.</li>";
+        return;
+      }
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const date = data.claimedAt?.toDate
+          ? data.claimedAt.toDate()
+          : new Date(data.claimedAt.seconds * 1000);
+        const li = document.createElement("li");
+        li.textContent = `${data.title} - Claimed on ${date.toLocaleString()}`;
+        historyList.appendChild(li);
+      });
+    }
+
+    async function loadLeaderboard() {
+      const tbody = document.getElementById("leaderboard-body");
+      tbody.innerHTML = "";
+      let rank = 1;
+
+      const snapshot = await db.collection("volunteers")
+        .orderBy("points", "desc")
+        .get();
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${rank}</td>
+          <td>${data.name || "Anonymous"}</td>
+          <td>${data.email || "N/A"}</td>
+          <td>${data.points || 0}</td>
+        `;
+        tbody.appendChild(row);
+        rank++;
+      });
+    }
+
+    function logout() {
+      auth.signOut().then(() => {
+        window.location.href = "volunteer_login.html";
+      });
+    }
+  </script>
+</body>
+</html>
