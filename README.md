@@ -18,7 +18,7 @@
 ## 📸 Screenshots
 
 ![Volunteer Dashboard](screenshots/volunteer_dashboard.png)  
-![Claim History](screenshots/user_dashboard.png)
+![User Dashboard](screenshots/user_dashboard.png)
 
 ---
 
