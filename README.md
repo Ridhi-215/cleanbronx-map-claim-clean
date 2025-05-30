@@ -99,4 +99,5 @@ We were inspired by the problem of unreported or ignored trash in local neighbor
 
 Made with ❤️ for the community.
 
-Have questions or feedback? Reach out via [GitHub Issues]([https://github.com/Ridhi-215/cleanbronx-map-claim-clean/issues) or email.
+Have questions or feedback? Reach out via [GitHub Issues](https://github.com/Ridhi-215/cleanbronx-map-claim-clean/issues) or email us at gunturridhi@gmail.com.
+
