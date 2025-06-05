@@ -12,6 +12,9 @@
 - 📜 Claim history tracking for accountability
 - 🏆 Real-time **leaderboard** for gamified recognition
 - 🎯 Clean, responsive frontend UI
+- 🗣️ Users can **report trash spots** via a form
+- 📍 Submitted spots appear on the **volunteer map** in real-time
+
 
 ---
 
@@ -71,9 +74,10 @@ firebase.initializeApp(firebaseConfig);
 
 ## 💡 Inspiration
 
-This project was built for a **social impact hackathon**.
+We were inspired by the real-world problem of unreported or ignored trash spots in urban areas.
 
-We were inspired by the problem of unreported or ignored trash in local neighborhoods. With CleanBronx, we aimed to create a **fun, rewarding, and impactful** platform for volunteers to take initiative in their communities.
+Our solution lets **users report trash**, and **volunteers claim and clean** them — creating a community-driven feedback loop for cleaner cities.
+
 
 ---
 
